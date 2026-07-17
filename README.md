@@ -21,7 +21,7 @@
 ---
 
 <div align="center">
-  <img src="docs/assets/control-center-preview.png" width="200" alt="AI Workspace Control Center public preview">
+  <img src="docs/assets/control-center-preview.png" width="240" alt="AI Workspace Control Center public preview">
 </div>
 
 ---

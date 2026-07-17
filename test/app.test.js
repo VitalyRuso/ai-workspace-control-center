@@ -163,8 +163,11 @@ test("center panel renders auth state before empty conversation state", () => {
   assert.match(app, /els\.welcome\.hidden = mode !== "logged-out"/);
   assert.match(app, /messages \$\{mode === "authenticated-empty" \? "empty-state" : ""\}/);
   const css = readFileSync(new URL("../public/styles.css", import.meta.url), "utf8");
+  assert.match(html, /<body data-page="loading">/);
   assert.match(css, /\[hidden\] \{ display:none !important; \}/);
+  assert.match(css, /body\[data-page="logged-out"\] header,body\[data-page="logged-out"\] aside/);
+  assert.match(css, /body\[data-page="logged-out"\] #composer \{ display:none !important; \}/);
   assert.match(css, /\.messages\.empty-state \{ justify-content:flex-start; \}/);
   assert.match(app, /<strong>Start a conversation<\/strong><span>Type a message below\. A new chat will be created automatically\.<\/span>/);
-  assert.match(app, /const canCompose = state\.authenticated === false \|\| \(state\.authenticated && state\.worker\?\.online && state\.usage\.remaining > 0\);/);
+  assert.match(app, /const canCompose = state\.authenticated && state\.worker\?\.online && state\.usage\.remaining > 0;/);
 });

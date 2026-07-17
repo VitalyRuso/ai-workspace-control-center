@@ -22,6 +22,7 @@ async function api(path, options = {}) {
 const json = (method, body, extraHeaders = {}) => ({ method, headers: { "content-type": "application/json", ...extraHeaders }, body: JSON.stringify(body || {}) });
 const currentDraftId = () => state.chat?.local ? "new" : state.chat?.id || "new";
 const elapsed = (date) => `${Math.max(0, Math.floor((Date.now() - Date.parse(date)) / 1000))}s`;
+const setPageMode = (mode) => { document.body.dataset.page = mode; };
 
 function setNotice(message, action = null) {
   els.notice.replaceChildren(); els.notice.hidden = !message;
@@ -89,7 +90,7 @@ function renderJob() {
 }
 
 function renderComposer() {
-  const canCompose = state.authenticated === false || (state.authenticated && state.worker?.online && state.usage.remaining > 0);
+  const canCompose = state.authenticated && state.worker?.online && state.usage.remaining > 0;
   els.prompt.disabled = state.authenticated == null || !canCompose || state.sending;
   els.send.disabled = els.prompt.disabled || !els.prompt.value.trim();
   els.prompt.placeholder = state.authenticated === false ? "Continue with GitHub to start a conversation." : state.authenticated ? "Ask anything — a new chat will be created automatically." : "Loading secure workspace…";
@@ -97,17 +98,17 @@ function renderComposer() {
 }
 
 function showLoading() {
-  state.authenticated = null; els["loading-indicator"].hidden = false; renderMessages(); renderComposer();
+  state.authenticated = null; setPageMode("loading"); els["loading-indicator"].hidden = false; renderMessages(); renderComposer();
 }
 
 function showLoggedOut(error = "") {
-  state.authenticated = false; state.worker = null; els["loading-indicator"].hidden = true; renderMessages();
+  state.authenticated = false; setPageMode("logged-out"); state.worker = null; els["loading-indicator"].hidden = true; renderMessages();
   els["chat-title"].textContent = "AI Workspace"; els["sidebar-note"].hidden = false; els["sidebar-note"].textContent = "Sign in to create private conversations.";
   els.prompt.value = readDraft(sessionStorage, null); if (error) setNotice(error, { label: "Retry", run: bootstrap }); renderAccount(); renderWorker(); renderChats(); updateCount();
 }
 
 function showRecoverableError(error) {
-  state.authenticated = null; els["loading-indicator"].hidden = true; renderMessages();
+  state.authenticated = null; setPageMode("loading"); els["loading-indicator"].hidden = true; renderMessages();
   setNotice(error.message, { label: "Retry", run: bootstrap }); els["worker-header"].textContent = "Connection interrupted"; renderComposer();
 }
 
@@ -166,7 +167,7 @@ async function sendMessage(event) {
 async function bootstrap() {
   setNotice(""); showLoading();
   try {
-    const me = await api("/api/me"); state.authenticated = true; state.user = me.user; state.usage = me.usage; els["loading-indicator"].hidden = true; renderAccount();
+    const me = await api("/api/me"); state.authenticated = true; setPageMode("authenticated"); state.user = me.user; state.usage = me.usage; els["loading-indicator"].hidden = true; renderAccount();
     await Promise.all([refreshChats(), refreshWorker()]);
     const restored = restoreAfterOAuth(sessionStorage, state.chats.map((chat) => chat.id)); const saved = localStorage.getItem("selectedChatId"); const selected = restored.restored ? restored.selectedChatId : (saved && (saved === "new" || state.chats.some((chat) => chat.id === saved)) ? saved : state.chats[0]?.id);
     if (selected === "new") startLocalChat(false); else if (selected) await selectChat(selected); else { els["chat-title"].textContent = "Create your first chat"; els.prompt.value = readDraft(sessionStorage, "new"); renderChats(); renderMessages(); updateCount(); }

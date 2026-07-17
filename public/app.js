@@ -1,4 +1,4 @@
-import { applyAcceptedResponse, clearAcceptedDraft, idempotencyKey, readDraft, restoreAfterOAuth, saveBeforeOAuth, startLocalConversation, writeDraft } from "./client-state.js";
+import { applyAcceptedResponse, centerMode, clearAcceptedDraft, idempotencyKey, readDraft, restoreAfterOAuth, saveBeforeOAuth, startLocalConversation, writeDraft } from "./client-state.js";
 
 const state = { authenticated: null, user: null, usage: { remaining: 0 }, worker: null, chats: [], chat: null, job: null, sending: false, pollTimer: null };
 const $ = (id) => document.getElementById(id);
@@ -69,8 +69,10 @@ function renderChats() {
 }
 
 function renderMessages() {
-  els.welcome.hidden = true; els["main-skeleton"].hidden = true; els.messages.hidden = false; els.messages.replaceChildren();
-  if (!state.chat?.messages?.length) { const empty = document.createElement("div"); empty.className = "empty"; empty.innerHTML = `<strong>${state.chat?.local ? "New unsaved conversation" : "Create your first chat"}</strong><span>Type below; the chat is saved only after the message is accepted.</span>`; els.messages.append(empty); return; }
+  const mode = centerMode(state.authenticated, state.chat);
+  els.welcome.hidden = mode !== "logged-out"; els["main-skeleton"].hidden = mode !== "loading"; els.messages.hidden = !["authenticated-empty", "messages"].includes(mode); els.messages.replaceChildren();
+  if (mode === "logged-out" || mode === "loading") return;
+  if (mode === "authenticated-empty") { const empty = document.createElement("div"); empty.className = "empty"; empty.innerHTML = "<strong>Start a conversation</strong><span>Type a message below. A new chat will be created automatically.</span>"; els.messages.append(empty); return; }
   for (const message of state.chat.messages) {
     const article = document.createElement("article"); article.className = `message ${message.role}`;
     const label = document.createElement("small"); label.textContent = message.role === "assistant" ? (message.model || "Local AI") : state.user.login;
@@ -94,17 +96,17 @@ function renderComposer() {
 }
 
 function showLoading() {
-  state.authenticated = null; els["loading-indicator"].hidden = false; els["main-skeleton"].hidden = false; els.welcome.hidden = true; els.messages.hidden = true; renderComposer();
+  state.authenticated = null; els["loading-indicator"].hidden = false; renderMessages(); renderComposer();
 }
 
 function showLoggedOut(error = "") {
-  state.authenticated = false; state.worker = null; els["loading-indicator"].hidden = true; els["main-skeleton"].hidden = true; els.welcome.hidden = false; els.messages.hidden = true;
+  state.authenticated = false; state.worker = null; els["loading-indicator"].hidden = true; renderMessages();
   els["chat-title"].textContent = "AI Workspace"; els["sidebar-note"].hidden = false; els["sidebar-note"].textContent = "Sign in to create private conversations.";
   els.prompt.value = readDraft(sessionStorage, null); if (error) setNotice(error, { label: "Retry", run: bootstrap }); renderAccount(); renderWorker(); renderChats(); updateCount();
 }
 
 function showRecoverableError(error) {
-  state.authenticated = null; els["loading-indicator"].hidden = true; els["main-skeleton"].hidden = true; els.welcome.hidden = false; els.messages.hidden = true;
+  state.authenticated = null; els["loading-indicator"].hidden = true; renderMessages();
   setNotice(error.message, { label: "Retry", run: bootstrap }); els["worker-header"].textContent = "Connection interrupted"; renderComposer();
 }
 

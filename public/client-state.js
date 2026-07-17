@@ -53,3 +53,9 @@ export function applyAcceptedResponse(state, payload) {
   state.chat = { ...payload.chat, messages: [], local: false };
   return state.chat;
 }
+
+export function centerMode(authenticated, chat) {
+  if (authenticated == null) return "loading";
+  if (!authenticated) return "logged-out";
+  return chat?.messages?.length ? "messages" : "authenticated-empty";
+}

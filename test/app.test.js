@@ -6,7 +6,7 @@ import { createServer } from "../server.js";
 import { createSession } from "../src/auth.js";
 import { MemoryStore } from "../src/store.js";
 import { parseLmStudioResponse } from "../worker/worker.js";
-import { applyAcceptedResponse, clearAcceptedDraft, readDraft, restoreAfterOAuth, saveBeforeOAuth, startLocalConversation, writeDraft } from "../public/client-state.js";
+import { applyAcceptedResponse, centerMode, clearAcceptedDraft, readDraft, restoreAfterOAuth, saveBeforeOAuth, startLocalConversation, writeDraft } from "../public/client-state.js";
 
 const secret = "test-session-secret-long-enough";
 const workerToken = "test-worker-token";
@@ -150,4 +150,17 @@ test("frontend keeps one persistent responsive shell", () => {
   assert.doesNotMatch(html, /login-view|full-screen|Initializing secure workspace/);
   assert.doesNotMatch(app, /document\.body\.innerHTML|app-shell[^\n]*replaceChildren/);
   assert.match(css, /grid-template-columns:260px/); assert.match(css, /minmax\(0,1fr\)/); assert.match(css, /@media \(max-width:800px\)/);
+});
+
+test("center panel renders auth state before empty conversation state", () => {
+  const html = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
+  const app = readFileSync(new URL("../public/app.js", import.meta.url), "utf8");
+  assert.equal(centerMode(false, null), "logged-out");
+  assert.equal(centerMode(true, null), "authenticated-empty");
+  assert.equal(centerMode(true, { messages: [] }), "authenticated-empty");
+  assert.equal(centerMode(true, { messages: [{ role: "user", content: "hello" }] }), "messages");
+  assert.match(html, /id="github-login"[^>]*>Continue with GitHub<\/button>/);
+  assert.match(app, /els\.welcome\.hidden = mode !== "logged-out"/);
+  assert.match(app, /<strong>Start a conversation<\/strong><span>Type a message below\. A new chat will be created automatically\.<\/span>/);
+  assert.match(app, /const canCompose = state\.authenticated === false \|\| \(state\.authenticated && state\.worker\?\.online && state\.usage\.remaining > 0\);/);
 });

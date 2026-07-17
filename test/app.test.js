@@ -10,13 +10,14 @@ import { applyAcceptedResponse, centerMode, clearAcceptedDraft, readDraft, resto
 
 const secret = "test-session-secret-long-enough";
 const workerToken = "test-worker-token";
-const userA = { id: "100", login: "vitaly-test", avatarUrl: "https://avatars.githubusercontent.com/u/100" };
+const workerId = "local-worker-01";
+const userA = { id: "100", login: "demo-user", avatarUrl: "https://avatars.githubusercontent.com/u/100" };
 const userB = { id: "200", login: "other-test", avatarUrl: "" };
 const session = (user) => `cc_session=${encodeURIComponent(createSession(user, secret))}`;
 
 test("authenticated asynchronous demo contract", async (t) => {
   const store = new MemoryStore();
-  const server = createServer({ store, env: { SESSION_SECRET: secret, WORKER_TOKEN: workerToken, WORKER_ID: "vitaly-pc-01", PUBLIC_BASE_URL: "http://127.0.0.1", GITHUB_CLIENT_ID: "test", GITHUB_CLIENT_SECRET: "test" } });
+  const server = createServer({ store, env: { SESSION_SECRET: secret, WORKER_TOKEN: workerToken, WORKER_ID: workerId, PUBLIC_BASE_URL: "http://127.0.0.1", GITHUB_CLIENT_ID: "test", GITHUB_CLIENT_SECRET: "test" } });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   t.after(() => new Promise((resolve) => server.close(resolve)));
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -36,7 +37,7 @@ test("authenticated asynchronous demo contract", async (t) => {
   });
 
   await t.test("worker token is mandatory", async () => {
-    const body = { workerId: "vitaly-pc-01", lmOnline: true, selectedModel: "qwen3.6-27b", models: ["qwen3.6-27b"] };
+    const body = { workerId, lmOnline: true, selectedModel: "qwen3.6-27b", models: ["qwen3.6-27b"] };
     assert.equal((await call("/api/local-worker/heartbeat", { method: "POST", body })).response.status, 401);
     assert.equal((await call("/api/local-worker/heartbeat", { token: workerToken, method: "POST", body })).response.status, 200);
   });
@@ -71,7 +72,7 @@ test("authenticated asynchronous demo contract", async (t) => {
   });
 
   await t.test("atomic claim returns the queued job once", async () => {
-    const pollBody = { workerId: "vitaly-pc-01", lmOnline: true, selectedModel: "qwen3.6-27b", models: ["qwen3.6-27b"] };
+    const pollBody = { workerId, lmOnline: true, selectedModel: "qwen3.6-27b", models: ["qwen3.6-27b"] };
     const claims = await Promise.all([call("/api/local-worker/poll", { token: workerToken, method: "POST", body: pollBody }), call("/api/local-worker/poll", { token: workerToken, method: "POST", body: pollBody })]);
     assert.deepEqual(claims.map((item) => item.response.status).sort(), [200, 204]);
     assert.equal(claims.find((item) => item.payload)?.payload.job.id, firstJob);
@@ -79,7 +80,7 @@ test("authenticated asynchronous demo contract", async (t) => {
 
   await t.test("completion is idempotent and persists assistant message", async () => {
     const route = `/api/local-worker/jobs/${firstJob}`;
-    const identity = { workerId: "vitaly-pc-01" };
+    const identity = { workerId };
     assert.equal((await call(`${route}/started`, { token: workerToken, method: "POST", body: identity })).response.status, 200);
     const completion = { ...identity, content: "A persisted local answer.", model: "qwen3.6-27b" };
     assert.equal((await call(`${route}/complete`, { token: workerToken, method: "POST", body: completion })).response.status, 200);
@@ -97,7 +98,7 @@ test("authenticated asynchronous demo contract", async (t) => {
 
   await t.test("expired lease is safely recoverable", async () => {
     const queued = [...store.jobs.values()].find((job) => job.status === "queued");
-    const pollBody = { workerId: "vitaly-pc-01", lmOnline: true, selectedModel: "qwen3.6-27b", models: ["qwen3.6-27b"] };
+    const pollBody = { workerId, lmOnline: true, selectedModel: "qwen3.6-27b", models: ["qwen3.6-27b"] };
     const claimed = await call("/api/local-worker/poll", { token: workerToken, method: "POST", body: pollBody }); assert.equal(claimed.payload.job.id, queued.id);
     queued.leaseExpiresAt = new Date(Date.now() - 1000).toISOString();
     const reclaimed = await call("/api/local-worker/poll", { token: workerToken, method: "POST", body: pollBody }); assert.equal(reclaimed.payload.job.id, queued.id);
@@ -191,7 +192,7 @@ test("worker model backends are explicit", async () => {
   const env = { LOCAL_CONTROL_CENTER_URL: "http://127.0.0.1:3478", LOCAL_CONTROL_CENTER_TOKEN: "local-token" };
   const status = await localControlCenterStatus(env, fetcher);
   assert.equal(status.online, true);
-  const result = await generateViaControlCenter(status, { id: "job-1", prompt: "hello", user: { provider: "github", externalId: "100", username: "vitaly-test" } }, env, fetcher);
+  const result = await generateViaControlCenter(status, { id: "job-1", prompt: "hello", user: { provider: "github", externalId: "100", username: "demo-user" } }, env, fetcher);
   assert.deepEqual(result, { content: "Control Center answer", model: "qwen3.6-27b" });
   assert.equal(calls.some((url) => url.includes(":1234") || url.includes("/v1/chat/completions")), false);
 
@@ -202,4 +203,48 @@ test("worker model backends are explicit", async () => {
   });
   assert.equal(fallbackStatus.online, true);
   assert.equal(fallbackCalls.some((url) => url.includes(":1234") && url.endsWith("/models")), true);
+});
+
+test("bridge offline state and response mapping are explicit", async () => {
+  const offline = await localControlCenterStatus({ LOCAL_CONTROL_CENTER_URL: "http://127.0.0.1:3478", LOCAL_CONTROL_CENTER_TOKEN: "local-token" }, async () => {
+    throw new Error("connect ECONNREFUSED 127.0.0.1:3478");
+  });
+  assert.equal(offline.online, false);
+  assert.match(offline.error, /ECONNREFUSED/);
+
+  await assert.rejects(
+    generateViaControlCenter({ online: false, error: "Bridge offline", selectedModel: "" }, { id: "job-2", prompt: "hello" }, { LOCAL_CONTROL_CENTER_TOKEN: "local-token" }),
+    /Bridge offline/
+  );
+
+  await assert.rejects(
+    generateViaControlCenter(
+      { online: true, selectedModel: "qwen3.6-27b" },
+      { id: "job-3", prompt: "hello" },
+      { LOCAL_CONTROL_CENTER_URL: "http://127.0.0.1:3478", LOCAL_CONTROL_CENTER_TOKEN: "local-token" },
+      async (url) => {
+        if (String(url).endsWith("/api/local-bridge/runs")) return Response.json({ run: { status: "failed", error: "Bridge rejected request" } }, { status: 200 });
+        throw new Error(`unexpected fetch ${url}`);
+      }
+    ),
+    /Bridge rejected request/
+  );
+});
+
+test("public documentation stays neutral and portable", () => {
+  const files = [
+    new URL("../README.md", import.meta.url),
+    new URL("../worker/README.md", import.meta.url),
+    new URL("../docs/ARCHITECTURE.md", import.meta.url),
+    new URL("../docs/SECURITY.md", import.meta.url),
+    new URL("../docs/screenshots/README.md", import.meta.url),
+    new URL("../public/index.html", import.meta.url),
+    new URL("../public/app.js", import.meta.url),
+    new URL("../LICENSE", import.meta.url),
+    new URL("../.env.example", import.meta.url)
+  ];
+  const combined = files.map((file) => readFileSync(file, "utf8")).join("\n");
+  assert.doesNotMatch(combined, /Vitaly|VitalyRuso|vitalijsolovev/i);
+  assert.doesNotMatch(combined, /E:\\|C:\\Users\\/);
+  assert.doesNotMatch(combined, /Vitaly Local Worker/i);
 });

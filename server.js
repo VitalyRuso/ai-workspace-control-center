@@ -76,7 +76,7 @@ async function serveStatic(response, pathname, id) {
 export function createServer(options = {}) {
   const env = { ...process.env, ...(options.env || {}) };
   const store = options.store || new FirestoreStore();
-  const workerId = env.WORKER_ID || "vitaly-pc-01";
+  const workerId = env.WORKER_ID || "local-worker-01";
   const baseUrl = env.PUBLIC_BASE_URL || "";
   const oauthReady = Boolean(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET && env.SESSION_SECRET && baseUrl);
 
@@ -139,7 +139,7 @@ export function createServer(options = {}) {
 
       if (request.method === "POST" && pathName === "/api/messages") {
         requireMutation(); const account = requireUser(); const input = await readJson(request); const content = messageContent(input);
-        const worker = await store.getWorkerStatus(workerId); if (!workerOnline(worker)) throw new StoreError(503, "worker_offline", "Vitaly Local Worker is offline.");
+        const worker = await store.getWorkerStatus(workerId); if (!workerOnline(worker)) throw new StoreError(503, "worker_offline", "Local Worker is offline.");
         const result = await store.createMessage(account.id, input.chatId ? String(input.chatId) : null, content, worker.selectedModel || "qwen3.6-27b", idempotencyKey(request));
         sendJson(response, 202, { chatId: result.chat.id, jobId: result.job.id, status: result.job.status, chat: { id: result.chat.id, title: result.chat.title } }, id); return;
       }
@@ -147,7 +147,7 @@ export function createServer(options = {}) {
       const messageMatch = pathName.match(/^\/api\/chats\/([^/]+)\/messages$/);
       if (messageMatch && request.method === "POST") {
         requireMutation(); const account = requireUser(); const input = await readJson(request); const content = messageContent(input);
-        const worker = await store.getWorkerStatus(workerId); if (!workerOnline(worker)) throw new StoreError(503, "worker_offline", "Vitaly Local Worker is offline.");
+        const worker = await store.getWorkerStatus(workerId); if (!workerOnline(worker)) throw new StoreError(503, "worker_offline", "Local Worker is offline.");
         const result = await store.createMessage(account.id, decodeURIComponent(messageMatch[1]), content, worker.selectedModel || "qwen3.6-27b", idempotencyKey(request, crypto.randomUUID()));
         sendJson(response, 202, { chatId: result.chat.id, jobId: result.job.id, status: result.job.status, chat: { id: result.chat.id, title: result.chat.title } }, id); return;
       }

@@ -81,7 +81,9 @@ export function createServer(options = {}) {
 
     try {
       if (request.method === "GET" && pathName === "/health") {
-        sendJson(response, 200, { ok: true, service: "ai-workspace-control-center", persistence: "firestore", oauthConfigured: oauthReady }, id); return;
+        let persistenceOk = true;
+        try { await store.health(); } catch { persistenceOk = false; }
+        sendJson(response, persistenceOk ? 200 : 503, { ok: persistenceOk, service: "ai-workspace-control-center", revision: process.env.K_REVISION || "local", persistence: "firestore", persistenceOk, oauthConfigured: oauthReady }, id); return;
       }
 
       if (request.method === "GET" && pathName === "/auth/github") {

@@ -44,6 +44,7 @@ function assertWorker(job, workerId) {
 
 export class MemoryStore {
   constructor() { this.users = new Map(); this.chats = new Map(); this.messages = new Map(); this.jobs = new Map(); this.usage = new Map(); this.workers = new Map(); }
+  async health() { return true; }
   async ensureUser(user) { this.users.set(user.id, { ...user, updatedAt: iso() }); }
   async listChats(ownerId) { return [...this.chats.values()].filter((x) => x.ownerId === ownerId).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)); }
   async createChat(ownerId, title) { const chat = newChat(ownerId, title); this.chats.set(chat.id, chat); return chat; }
@@ -86,6 +87,7 @@ export class MemoryStore {
 
 export class FirestoreStore {
   constructor(db = new Firestore()) { this.db = db; }
+  async health() { await this.db.collection("worker_status").limit(1).get(); return true; }
   async ensureUser(user) { await this.db.collection("users").doc(user.id).set({ ...user, updatedAt: iso() }, { merge: true }); }
   async listChats(ownerId) { const snap = await this.db.collection("chats").where("ownerId", "==", ownerId).limit(100).get(); return snap.docs.map((doc) => doc.data()).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)); }
   async createChat(ownerId, title) { const chat = newChat(ownerId, title); await this.db.collection("chats").doc(chat.id).create(chat); return chat; }

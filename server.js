@@ -45,6 +45,19 @@ function secureEqual(actual, expected) {
 
 function workerOnline(worker) { return Boolean(worker?.online && worker.lastSeen && Date.now() - Date.parse(worker.lastSeen) < 30_000); }
 
+function messageContent(input) {
+  const content = String(input.content || "").trim();
+  if (!content) throw new StoreError(400, "message_required", "Message is required.");
+  if (content.length > 4_000) throw new StoreError(413, "prompt_too_large", "Messages are limited to 4,000 characters.");
+  return content;
+}
+
+function idempotencyKey(request, fallback = null) {
+  const value = String(request.headers["idempotency-key"] || fallback || "").trim();
+  if (!/^[a-zA-Z0-9._:-]{8,128}$/.test(value)) throw new StoreError(400, "invalid_idempotency_key", "A valid Idempotency-Key header is required.");
+  return value;
+}
+
 async function serveStatic(response, pathname, id) {
   const requested = pathname === "/" ? "/index.html" : decodeURIComponent(pathname);
   const filePath = path.resolve(publicDir, `.${requested}`);
@@ -124,12 +137,19 @@ export function createServer(options = {}) {
       if (chatMatch && request.method === "GET") { const account = requireUser(); const chat = await store.getChatWithMessages(account.id, decodeURIComponent(chatMatch[1])); if (!chat) throw new StoreError(404, "chat_not_found", "Chat not found."); sendJson(response, 200, { chat }, id); return; }
       if (chatMatch && request.method === "PATCH") { requireMutation(); const account = requireUser(); const input = await readJson(request); const chat = await store.renameChat(account.id, decodeURIComponent(chatMatch[1]), input.title); if (!chat) throw new StoreError(404, "chat_not_found", "Chat not found."); sendJson(response, 200, { chat }, id); return; }
 
+      if (request.method === "POST" && pathName === "/api/messages") {
+        requireMutation(); const account = requireUser(); const input = await readJson(request); const content = messageContent(input);
+        const worker = await store.getWorkerStatus(workerId); if (!workerOnline(worker)) throw new StoreError(503, "worker_offline", "Vitaly Local Worker is offline.");
+        const result = await store.createMessage(account.id, input.chatId ? String(input.chatId) : null, content, worker.selectedModel || "qwen3.6-27b", idempotencyKey(request));
+        sendJson(response, 202, { chatId: result.chat.id, jobId: result.job.id, status: result.job.status, chat: { id: result.chat.id, title: result.chat.title } }, id); return;
+      }
+
       const messageMatch = pathName.match(/^\/api\/chats\/([^/]+)\/messages$/);
       if (messageMatch && request.method === "POST") {
-        requireMutation(); const account = requireUser(); const input = await readJson(request); const content = String(input.content || "").trim();
-        if (!content) throw new StoreError(400, "message_required", "Message is required."); if (content.length > 4_000) throw new StoreError(413, "prompt_too_large", "Messages are limited to 4,000 characters.");
+        requireMutation(); const account = requireUser(); const input = await readJson(request); const content = messageContent(input);
         const worker = await store.getWorkerStatus(workerId); if (!workerOnline(worker)) throw new StoreError(503, "worker_offline", "Vitaly Local Worker is offline.");
-        const job = await store.createJob(account.id, decodeURIComponent(messageMatch[1]), content, worker.selectedModel || "qwen3.6-27b"); sendJson(response, 202, { jobId: job.id, status: "queued" }, id); return;
+        const result = await store.createMessage(account.id, decodeURIComponent(messageMatch[1]), content, worker.selectedModel || "qwen3.6-27b", idempotencyKey(request, crypto.randomUUID()));
+        sendJson(response, 202, { chatId: result.chat.id, jobId: result.job.id, status: result.job.status, chat: { id: result.chat.id, title: result.chat.title } }, id); return;
       }
 
       const publicJobMatch = pathName.match(/^\/api\/jobs\/([^/]+)$/);

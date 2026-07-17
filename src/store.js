@@ -30,6 +30,10 @@ function newJob(ownerId, chatId, prompt, model) {
   return { id: crypto.randomUUID(), ownerId, chatId, prompt, model, status: "queued", workerId: null, leaseExpiresAt: null, createdAt: iso(now), startedAt: null, completedAt: null, result: null, error: null, expiresAt: iso(now + JOB_TTL_MS) };
 }
 
+export function titleFromPrompt(prompt) {
+  return String(prompt || "").trim().replace(/\s+/g, " ").slice(0, 60) || "New conversation";
+}
+
 function titleValue(title) {
   const value = String(title || "").trim();
   if (!value || value.length > 80) throw new StoreError(400, "invalid_title", "Title must contain 1–80 characters.");
@@ -43,7 +47,7 @@ function assertWorker(job, workerId) {
 }
 
 export class MemoryStore {
-  constructor() { this.users = new Map(); this.chats = new Map(); this.messages = new Map(); this.jobs = new Map(); this.usage = new Map(); this.workers = new Map(); }
+  constructor() { this.users = new Map(); this.chats = new Map(); this.messages = new Map(); this.jobs = new Map(); this.usage = new Map(); this.workers = new Map(); this.idempotency = new Map(); }
   async health() { return true; }
   async ensureUser(user) { this.users.set(user.id, { ...user, updatedAt: iso() }); }
   async listChats(ownerId) { return [...this.chats.values()].filter((x) => x.ownerId === ownerId).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)); }
@@ -52,14 +56,18 @@ export class MemoryStore {
   async renameChat(ownerId, id, title) { const chat = await this.getChat(ownerId, id); if (!chat) return null; chat.title = titleValue(title); chat.updatedAt = iso(); return chat; }
   async getChatWithMessages(ownerId, id) { const chat = await this.getChat(ownerId, id); return chat ? { ...chat, messages: sorted([...this.messages.values()].filter((x) => x.chatId === id && x.ownerId === ownerId)) } : null; }
   async getUsage(ownerId) { const count = this.usage.get(`${ownerId}_${day()}`) || 0; return { date: day(), generationCount: count, remaining: Math.max(0, DAY_LIMIT - count) }; }
-  async createJob(ownerId, chatId, prompt, model) {
-    const chat = await this.getChat(ownerId, chatId); if (!chat) throw new StoreError(404, "chat_not_found", "Chat not found.");
+  async createMessage(ownerId, chatId, prompt, model, idempotencyKey) {
+    const idempotencyId = `${ownerId}:${idempotencyKey}`;
+    if (this.idempotency.has(idempotencyId)) return this.idempotency.get(idempotencyId);
+    const chat = chatId ? await this.getChat(ownerId, chatId) : newChat(ownerId, titleFromPrompt(prompt));
+    if (!chat) throw new StoreError(404, "chat_not_found", "Chat not found.");
     const usageKey = `${ownerId}_${day()}`; const count = this.usage.get(usageKey) || 0;
     if (count >= DAY_LIMIT) throw new StoreError(429, "quota_exhausted", "Daily generation limit reached.");
-    const job = newJob(ownerId, chatId, prompt, model); const message = { id: crypto.randomUUID(), chatId, ownerId, role: "user", content: prompt, model: null, jobId: job.id, createdAt: iso() };
-    this.usage.set(usageKey, count + 1); this.jobs.set(job.id, job); this.messages.set(message.id, message); chat.updatedAt = iso();
-    return publicJob(job);
+    const job = newJob(ownerId, chat.id, prompt, model); const message = { id: crypto.randomUUID(), chatId: chat.id, ownerId, role: "user", content: prompt, model: null, jobId: job.id, createdAt: iso() };
+    this.usage.set(usageKey, count + 1); this.chats.set(chat.id, chat); this.jobs.set(job.id, job); this.messages.set(message.id, message); chat.updatedAt = iso();
+    const result = { chat, job: publicJob(job) }; this.idempotency.set(idempotencyId, result); return result;
   }
+  async createJob(ownerId, chatId, prompt, model) { return (await this.createMessage(ownerId, chatId, prompt, model, crypto.randomUUID())).job; }
   async getJob(ownerId, id) { const job = this.jobs.get(id); if (!job || job.ownerId !== ownerId) return null; if (!["completed", "failed", "expired"].includes(job.status) && job.expiresAt < iso()) { job.status = "expired"; job.error = "Job expired before completion."; } return publicJob(job); }
   async heartbeat(workerId, input) { const worker = { workerId, online: Boolean(input.lmOnline), busy: Boolean(input.busy), models: input.models || [], selectedModel: input.selectedModel || "", lastSeen: iso(), version: input.version || "" }; this.workers.set(workerId, worker); return worker; }
   async getWorkerStatus(workerId) { return this.workers.get(workerId) || null; }
@@ -95,16 +103,24 @@ export class FirestoreStore {
   async renameChat(ownerId, id, title) { const chat = await this.getChat(ownerId, id); if (!chat) return null; const update = { title: titleValue(title), updatedAt: iso() }; await this.db.collection("chats").doc(id).update(update); return { ...chat, ...update }; }
   async getChatWithMessages(ownerId, id) { const chat = await this.getChat(ownerId, id); if (!chat) return null; const snap = await this.db.collection("messages").where("chatId", "==", id).limit(500).get(); return { ...chat, messages: sorted(snap.docs.map((doc) => doc.data()).filter((x) => x.ownerId === ownerId)) }; }
   async getUsage(ownerId) { const snap = await this.db.collection("daily_usage").doc(`${ownerId}_${day()}`).get(); const count = snap.exists ? Number(snap.data().generationCount || 0) : 0; return { date: day(), generationCount: count, remaining: Math.max(0, DAY_LIMIT - count) }; }
-  async createJob(ownerId, chatId, prompt, model) {
-    const job = newJob(ownerId, chatId, prompt, model); const message = { id: crypto.randomUUID(), chatId, ownerId, role: "user", content: prompt, model: null, jobId: job.id, createdAt: iso() };
-    const chatRef = this.db.collection("chats").doc(chatId); const usageRef = this.db.collection("daily_usage").doc(`${ownerId}_${day()}`);
-    await this.db.runTransaction(async (tx) => {
-      const [chatSnap, usageSnap] = await Promise.all([tx.get(chatRef), tx.get(usageRef)]); const chat = chatSnap.exists ? chatSnap.data() : null;
+  async createMessage(ownerId, chatId, prompt, model, idempotencyKey) {
+    const autoChat = chatId ? null : newChat(ownerId, titleFromPrompt(prompt)); const resolvedChatId = chatId || autoChat.id;
+    const job = newJob(ownerId, resolvedChatId, prompt, model); const message = { id: crypto.randomUUID(), chatId: resolvedChatId, ownerId, role: "user", content: prompt, model: null, jobId: job.id, createdAt: iso() };
+    const chatRef = this.db.collection("chats").doc(resolvedChatId); const usageRef = this.db.collection("daily_usage").doc(`${ownerId}_${day()}`);
+    const idempotencyId = crypto.createHash("sha256").update(`${ownerId}:${idempotencyKey}`).digest("hex"); const idempotencyRef = this.db.collection("idempotency").doc(idempotencyId);
+    return this.db.runTransaction(async (tx) => {
+      const idempotencySnap = await tx.get(idempotencyRef); if (idempotencySnap.exists) return idempotencySnap.data().result;
+      const chatSnap = chatId ? await tx.get(chatRef) : null; const usageSnap = await tx.get(usageRef); const chat = chatId ? (chatSnap.exists ? chatSnap.data() : null) : autoChat;
       if (chat?.ownerId !== ownerId) throw new StoreError(404, "chat_not_found", "Chat not found.");
       const count = usageSnap.exists ? Number(usageSnap.data().generationCount || 0) : 0; if (count >= DAY_LIMIT) throw new StoreError(429, "quota_exhausted", "Daily generation limit reached.");
-      tx.set(usageRef, { ownerId, date: day(), generationCount: count + 1 }, { merge: true }); tx.create(this.db.collection("jobs").doc(job.id), job); tx.create(this.db.collection("messages").doc(message.id), message); tx.update(chatRef, { updatedAt: iso() });
-    }); return publicJob(job);
+      const result = { chat, job: publicJob(job) };
+      tx.set(usageRef, { ownerId, date: day(), generationCount: count + 1 }, { merge: true });
+      if (!chatId) tx.create(chatRef, chat); else tx.update(chatRef, { updatedAt: iso() });
+      tx.create(this.db.collection("jobs").doc(job.id), job); tx.create(this.db.collection("messages").doc(message.id), message); tx.create(idempotencyRef, { ownerId, createdAt: iso(), result });
+      return result;
+    });
   }
+  async createJob(ownerId, chatId, prompt, model) { return (await this.createMessage(ownerId, chatId, prompt, model, crypto.randomUUID())).job; }
   async getJob(ownerId, id) { const ref = this.db.collection("jobs").doc(id); const snap = await ref.get(); const job = snap.exists ? snap.data() : null; if (!job || job.ownerId !== ownerId) return null; if (!["completed", "failed", "expired"].includes(job.status) && job.expiresAt < iso()) { job.status = "expired"; job.error = "Job expired before completion."; await ref.update({ status: job.status, error: job.error }); } return publicJob(job); }
   async heartbeat(workerId, input) { const worker = { workerId, online: Boolean(input.lmOnline), busy: Boolean(input.busy), models: Array.isArray(input.models) ? input.models.slice(0, 20).map(String) : [], selectedModel: String(input.selectedModel || ""), lastSeen: iso(), version: String(input.version || "") }; await this.db.collection("worker_status").doc(workerId).set(worker); return worker; }
   async getWorkerStatus(workerId) { const snap = await this.db.collection("worker_status").doc(workerId).get(); return snap.exists ? snap.data() : null; }

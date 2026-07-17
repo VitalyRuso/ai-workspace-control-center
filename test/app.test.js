@@ -167,6 +167,7 @@ test("center panel renders auth state before empty conversation state", () => {
   assert.match(css, /\[hidden\] \{ display:none !important; \}/);
   assert.match(css, /body\[data-page="logged-out"\] header,body\[data-page="logged-out"\] aside/);
   assert.match(css, /body\[data-page="logged-out"\] #composer \{ display:none !important; \}/);
+  assert.match(css, /body\[data-page="logged-out"\] \.welcome .*margin:0 auto.*place-content:center/);
   assert.match(css, /grid-template-rows:auto auto auto auto minmax\(0,1fr\) auto/);
   assert.match(css, /#composer \{ grid-row:6;/);
   assert.match(css, /\.messages\.empty-state \{ justify-content:flex-start; \}/);

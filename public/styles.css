@@ -8,7 +8,7 @@ body[data-page="logged-out"] header,body[data-page="logged-out"] aside,body[data
 body[data-page="logged-out"] .workspace { min-height:100vh; height:auto; display:block; }
 body[data-page="logged-out"] .conversation { min-height:100vh; display:block; background:transparent; }
 body[data-page="logged-out"] .content { min-height:100vh; overflow:visible; }
-body[data-page="logged-out"] .welcome { min-height:100vh; height:auto; width:min(580px,100%); margin:0; padding:36px clamp(24px,4vw,48px); place-content:start; align-content:start; }
+body[data-page="logged-out"] .welcome { min-height:100vh; height:auto; width:min(580px,100%); margin:0 auto; padding:36px clamp(24px,4vw,48px); place-content:center; align-content:center; }
 body[data-page="logged-out"] .welcome h2 { font-size:clamp(42px,5vw,56px); }
 header { height:62px; display:grid; grid-template-columns:1fr auto 1fr; align-items:center; border-bottom:1px solid var(--line); padding:9px 14px; }
 .brand,.account,.header-status { display:flex; align-items:center; gap:11px; } .account { justify-content:flex-end; color:var(--muted); font-size:12px; } .account img { width:32px; height:32px; border:1px solid var(--line); border-radius:50%; }

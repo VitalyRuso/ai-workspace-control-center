@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AI Workspace Shell</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main id="ai-os-shell" class="ai-os-shell" data-component="AiOsShell">
+      <header class="ai-os-topbar" data-component="AiOsTopBar">
+        <div class="topbar-brand">
+          <span class="brand-mark" aria-hidden="true">AI</span>
+          <div>
+            <p class="eyebrow">Local AI OS</p>
+            <strong>AI Workspace</strong>
+          </div>
+        </div>
+        <div class="topbar-path">
+          <span>Workspace root</span>
+          <strong id="workspace-path">Loading...</strong>
+        </div>
+        <div class="topbar-status">
+          <span class="topbar-metric metric-safe"><i aria-hidden="true"></i><span id="safe-mode">Safe mode</span></span>
+          <span class="topbar-metric"><span id="runtime-summary">0 tools</span></span>
+          <span class="topbar-metric"><i aria-hidden="true"></i><span id="running-summary">0 running</span></span>
+        </div>
+      </header>
+
+      <section class="ai-os-desktop" aria-label="AI Workspace desktop">
+        <div class="desktop-welcome" id="desktop-copy" data-component="AiOsQuickLaunch">
+          <section class="desktop-hero">
+            <div class="desktop-kicker"><span aria-hidden="true"></span>Runtime-controlled local workspace</div>
+            <h1>AI Workspace</h1>
+            <p class="desktop-subtitle">Local AI operating workspace</p>
+            <p class="desktop-description">Build, analyze and control AI-powered project tools locally.</p>
+            <div class="quick-launch-grid" id="quick-launch">
+              <button type="button" data-quick-launch-app="ai-chat">
+                <span class="quick-launch-mark">AI</span><span><strong>AI Chat</strong><small>Local planning and actions</small></span><b aria-hidden="true">&gt;</b>
+              </button>
+              <button type="button" data-quick-launch-app="generator">
+                <span class="quick-launch-mark">GN</span><span><strong>Generator</strong><small>Scaffolds, plans and patches</small></span><b aria-hidden="true">&gt;</b>
+              </button>
+              <button type="button" data-quick-launch-app="fullstack-designer">
+                <span class="quick-launch-mark">FD</span><span><strong>Fullstack Designer</strong><small>Architecture and UI planning</small></span><b aria-hidden="true">&gt;</b>
+              </button>
+              <button type="button" data-quick-launch-app="tools">
+                <span class="quick-launch-mark">TL</span><span><strong>Tools</strong><small>On-demand runtime commands</small></span><b aria-hidden="true">&gt;</b>
+              </button>
+              <button type="button" data-quick-launch-app="system-monitor">
+                <span class="quick-launch-mark">SM</span><span><strong>System Monitor</strong><small>Runtime health and history</small></span><b aria-hidden="true">&gt;</b>
+              </button>
+            </div>
+          </section>
+          <aside class="desktop-status-panel" aria-label="Workspace status">
+            <div class="desktop-status-heading">
+              <div><p class="eyebrow">System status</p><h2>Workspace ready</h2></div>
+              <span class="status-beacon" aria-hidden="true"></span>
+            </div>
+            <dl class="desktop-status-list">
+              <div><dt>Safety</dt><dd id="home-safe-mode">Safe mode</dd></div>
+              <div><dt>Running processes</dt><dd id="home-running-count">0</dd></div>
+              <div><dt>Enabled tools</dt><dd id="home-enabled-tools">0 / 0</dd></div>
+              <div><dt>Workspace path</dt><dd id="home-workspace-path">E:/AI_WORKSPACE</dd></div>
+            </dl>
+            <p class="desktop-safety-note"><span aria-hidden="true"></span>Tools run only when requested.</p>
+          </aside>
+        </div>
+        <div id="window-layer" class="window-layer" data-component="AiOsWindowManager"></div>
+      </section>
+
+      <nav class="ai-os-taskbar" data-component="AiOsTaskbar" aria-label="Open applications">
+        <button id="start-button" class="start-button" type="button" aria-expanded="false"><span aria-hidden="true">AI</span>Start</button>
+        <div id="taskbar-windows" class="taskbar-windows"></div>
+        <div class="taskbar-summary">
+          <span class="taskbar-safe"><i aria-hidden="true"></i><span id="taskbar-safe-mode">Safe mode</span></span>
+          <span id="taskbar-running-count">0 running</span>
+        </div>
+      </nav>
+
+      <section id="start-menu" class="start-menu" data-component="AiOsStartMenu" hidden></section>
+    </main>
+
+    <div id="app-templates" hidden>
+      <section class="shell-panel" id="panel-dashboard" data-shell-panel="dashboard">
+        <div class="panel-heading">
+          <p class="eyebrow">System</p>
+          <h2>System Monitor</h2>
+          <p class="panel-description">Local runtime health, tool availability and recent activity.</p>
+        </div>
+        <div id="dashboard-stats" class="stat-grid"></div>
+        <div id="dashboard-recent" class="two-column"></div>
+      </section>
+
+      <section class="shell-panel" id="panel-apps" data-shell-panel="apps">
+        <div class="panel-heading">
+          <p class="eyebrow">Registry</p>
+          <h2>Apps Manager</h2>
+        </div>
+        <div class="two-column">
+          <div id="apps"></div>
+          <div>
+            <h3 id="app-name">No app selected</h3>
+            <dl id="app-details"></dl>
+            <div id="registry-errors" class="errors" hidden></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="shell-panel" id="panel-tools" data-shell-panel="tools">
+        <div class="panel-heading">
+          <p class="eyebrow">Runtime Manager</p>
+          <h2>Tools</h2>
+          <p class="panel-description">Run enabled workspace commands on demand. Nothing starts automatically.</p>
+        </div>
+        <div id="commands"></div>
+      </section>
+
+      <section class="shell-panel" id="panel-workflows" data-shell-panel="workflows">
+        <div class="panel-heading">
+          <p class="eyebrow">Manual</p>
+          <h2>Workflows</h2>
+        </div>
+        <div id="workflows"></div>
+        <div id="workflow-result" class="latest-result" hidden></div>
+        <div id="workflow-runs"></div>
+      </section>
+
+      <section class="shell-panel" id="panel-intake" data-shell-panel="intake">
+        <div class="panel-heading">
+          <p class="eyebrow">Human Input</p>
+          <h2>Project Intake</h2>
+        </div>
+        <form id="project-intake-form" class="intake-form">
+          <label class="field-label">Project name <input name="projectName" type="text" autocomplete="off"></label>
+          <label class="field-label">Who is it for? <input name="whoIsItFor" type="text" autocomplete="off"></label>
+          <label class="field-label">What problem should it solve? <textarea name="problemDescription" rows="3"></textarea></label>
+          <label class="field-label">What is missing now? <textarea name="whatIsMissingNow" rows="3"></textarea></label>
+          <label class="field-label">Desired result <textarea name="desiredResult" rows="3"></textarea></label>
+          <label class="field-label">Must-have features <textarea name="mustHaveFeatures" rows="3"></textarea></label>
+          <label class="field-label">Nice-to-have features <textarea name="niceToHaveFeatures" rows="3"></textarea></label>
+          <label class="field-label">Examples or references <textarea name="examplesOrReferences" rows="2"></textarea></label>
+          <label class="field-label">Constraints <textarea name="constraints" rows="2"></textarea></label>
+          <label class="field-label">Notes <textarea name="notes" rows="2"></textarea></label>
+          <button class="run-button" type="submit">Analyze Intake</button>
+        </form>
+        <div id="project-intake-result" class="intake-result" hidden></div>
+        <div id="project-intakes"></div>
+      </section>
+
+      <section class="shell-panel" id="panel-chat" data-shell-panel="chat" data-component="AiOsChatWindow">
+        <div class="panel-heading">
+          <div><p class="eyebrow">Local workspace assistant</p><h2>AI Chat</h2></div>
+          <div class="chat-heading-actions">
+            <span id="local-llm-badge" class="chat-local-badge" aria-live="polite">Checking local model</span>
+            <button id="open-local-llm-settings" class="secondary-button" type="button">Settings</button>
+          </div>
+        </div>
+        <div class="chat-context-strip">
+          <span aria-hidden="true"></span><p id="chat-context">No active app context yet.</p>
+          <div id="local-llm-summary" class="chat-model-summary" aria-live="polite">Loading local model status...</div>
+        </div>
+        <div class="chat-layout">
+          <aside class="chat-sidebar">
+            <details id="local-llm-settings" class="new-chat-details local-llm-settings">
+              <summary>Local model settings</summary>
+              <form id="local-llm-config-form" class="stack">
+                <label class="field-label">Provider <input id="local-llm-provider" type="text" readonly></label>
+                <label class="field-label">Base URL <input id="local-llm-base-url" name="baseUrl" type="url" autocomplete="off" required></label>
+                <label class="field-label">Model <select id="local-llm-model" name="activeModel"></select></label>
+                <label class="field-label">Context limit <input id="local-llm-context-limit" type="text" readonly></label>
+                <div class="local-llm-buttons">
+                  <button id="local-llm-test" class="secondary-button" type="button">Test Connection</button>
+                  <button id="local-llm-refresh" class="secondary-button" type="button">Refresh Models</button>
+                  <button id="local-llm-unload" class="secondary-button" type="button">Unload Model</button>
+                  <button class="run-button" type="submit">Save</button>
+                </div>
+                <p id="local-llm-settings-status" class="muted" aria-live="polite"></p>
+              </form>
+            </details>
+            <div class="chat-sidebar-heading"><strong>Conversations</strong><span>Saved locally</span></div>
+            <details id="new-chat-details" class="new-chat-details" open>
+              <summary>New conversation</summary>
+              <form id="new-chat-form" class="stack">
+                <label class="field-label">Title <input name="title" type="text" autocomplete="off" placeholder="Project planning"></label>
+                <label class="field-label">Project name <input name="projectName" type="text" autocomplete="off" placeholder="Optional"></label>
+                <button class="run-button" type="submit">Create Chat</button>
+              </form>
+            </details>
+            <div id="chat-list" class="chat-list"></div>
+          </aside>
+          <section class="chat-conversation">
+            <div class="idea-lab-toolbar">
+              <div class="idea-lab-heading">
+                <strong>Idea Lab</strong>
+                <select id="chat-mode" aria-label="Chat mode"><option value="chat">Chat</option><option value="idea_lab">Idea Lab</option></select>
+                <span id="idea-lab-status" aria-live="polite">Ready</span>
+              </div>
+              <div id="idea-lab-controls" class="idea-lab-controls">
+                <button class="secondary-button" type="button" data-idea-action="analyze">Analyze Idea</button>
+                <button class="secondary-button" type="button" data-idea-action="generate-variants">Generate Variants</button>
+                <button class="secondary-button" type="button" data-idea-action="critique">Critique</button>
+                <button class="secondary-button" type="button" data-idea-action="analyze-with-tools">Analyze With Tools</button>
+                <button class="secondary-button" type="button" data-idea-action="compare">Compare Results</button>
+                <button class="secondary-button" type="button" data-idea-action="use-recommended">Use Recommended Variant</button>
+                <button class="secondary-button" type="button" data-idea-action="send-to-fullstack-designer">Send to Fullstack Designer</button>
+                <button class="secondary-button" type="button" data-idea-action="create-project-intake">Create Project Intake</button>
+              </div>
+            </div>
+            <div id="chat-messages" class="chat-messages" aria-live="polite"></div>
+            <div id="chat-actions" class="chat-actions"></div>
+            <form id="chat-message-form" class="chat-input">
+              <textarea id="chat-input" name="content" rows="2" aria-label="Message" placeholder="Ask about a project, workflow or next action..."></textarea>
+              <button id="chat-send-button" class="run-button" type="submit">Send</button>
+              <p id="chat-request-status" class="chat-request-status" aria-live="polite"></p>
+            </form>
+          </section>
+        </div>
+      </section>
+
+      <section class="shell-panel" id="panel-files" data-shell-panel="files">
+        <div class="panel-heading">
+          <p class="eyebrow">Safe Files</p>
+          <h2>Files</h2>
+        </div>
+        <form id="workspace-browse-form" class="inline-form">
+          <label class="field-label">Path <input id="workspace-path-input" name="path" type="text" autocomplete="off"></label>
+          <button class="secondary-button" type="submit">Open</button>
+        </form>
+        <div id="workspace-files"></div>
+        <div class="two-column">
+          <form id="create-folder-form" class="stack">
+            <h3>Create Folder</h3>
+            <label class="field-label">Path <input name="path" type="text" autocomplete="off"></label>
+            <button class="secondary-button" type="submit">Create Folder</button>
+          </form>
+          <form id="create-file-form" class="stack">
+            <h3>Create Text File</h3>
+            <label class="field-label">Path <input name="path" type="text" autocomplete="off"></label>
+            <label class="field-label">Content <textarea name="content" rows="5"></textarea></label>
+            <button class="secondary-button" type="submit">Create File</button>
+          </form>
+        </div>
+        <form id="write-file-form" class="stack">
+          <h3>Write Text File</h3>
+          <label class="field-label">Path <input name="path" type="text" autocomplete="off"></label>
+          <label class="field-label">Content <textarea name="content" rows="7"></textarea></label>
+          <button class="secondary-button" type="submit">Write File</button>
+        </form>
+      </section>
+
+      <section class="shell-panel" id="panel-logs" data-shell-panel="logs">
+        <div class="panel-heading">
+          <p class="eyebrow">History</p>
+          <h2>Logs</h2>
+        </div>
+        <div id="latest-result" class="latest-result" hidden></div>
+        <div id="log"></div>
+      </section>
+    </div>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

@@ -12,7 +12,7 @@
 
 **One interface. Multiple tools. Explicit control.**
 
-[OPEN LIVE DEMO](https://CONTROL-CENTER-DEMO-URL.run.app) ·
+[OPEN LIVE DEMO](https://ai-workspace-control-center-745947699440.europe-west1.run.app) ·
 [VIEW ARCHITECTURE](#architecture) ·
 [PROJECT ROADMAP](#roadmap)
 

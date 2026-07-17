@@ -10,6 +10,9 @@ body[data-page="logged-out"] .conversation { min-height:100vh; display:block; ba
 body[data-page="logged-out"] .content { min-height:100vh; overflow:visible; }
 body[data-page="logged-out"] .welcome { min-height:100vh; height:auto; width:min(580px,100%); margin:0 auto; padding:36px clamp(24px,4vw,48px); place-content:center; align-content:center; }
 body[data-page="logged-out"] .welcome h2 { font-size:clamp(42px,5vw,56px); }
+body[data-page="loading"] header,body[data-page="loading"] aside,body[data-page="loading"] .conversation-head,body[data-page="loading"] #worker-status,body[data-page="loading"] #composer { display:none !important; }
+body[data-page="loading"] .shell { width:100%; height:100vh; margin:0; border:0; box-shadow:none; background:transparent; }
+body[data-page="loading"] .workspace,body[data-page="loading"] .conversation,body[data-page="loading"] .content { height:100vh; display:block; background:transparent; }
 header { height:62px; display:grid; grid-template-columns:1fr auto 1fr; align-items:center; border-bottom:1px solid var(--line); padding:9px 14px; }
 .brand,.account,.header-status { display:flex; align-items:center; gap:11px; } .account { justify-content:flex-end; color:var(--muted); font-size:12px; } .account img { width:32px; height:32px; border:1px solid var(--line); border-radius:50%; }
 .logo { display:grid; place-items:center; width:40px; height:40px; color:var(--cyan); border:1px solid var(--cyan); font-size:13px; font-weight:900; box-shadow:0 0 22px #20e6d333; clip-path:polygon(14% 0,100% 0,100% 86%,86% 100%,0 100%,0 14%); }

@@ -71,6 +71,7 @@ function renderChats() {
 function renderMessages() {
   const mode = centerMode(state.authenticated, state.chat);
   els.welcome.hidden = mode !== "logged-out"; els["main-skeleton"].hidden = mode !== "loading"; els.messages.hidden = !["authenticated-empty", "messages"].includes(mode); els.messages.replaceChildren();
+  els.messages.className = `messages ${mode === "authenticated-empty" ? "empty-state" : ""}`;
   if (mode === "logged-out" || mode === "loading") return;
   if (mode === "authenticated-empty") { const empty = document.createElement("div"); empty.className = "empty"; empty.innerHTML = "<strong>Start a conversation</strong><span>Type a message below. A new chat will be created automatically.</span>"; els.messages.append(empty); return; }
   for (const message of state.chat.messages) {

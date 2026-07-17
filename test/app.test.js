@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { createServer } from "../server.js";
 import { createSession } from "../src/auth.js";
 import { MemoryStore } from "../src/store.js";
-import { parseLmStudioResponse } from "../worker/worker.js";
+import { generateViaControlCenter, lmStatus, localControlCenterStatus, parseLmStudioResponse, workerBackend } from "../worker/worker.js";
 import { applyAcceptedResponse, centerMode, clearAcceptedDraft, readDraft, restoreAfterOAuth, saveBeforeOAuth, startLocalConversation, writeDraft } from "../public/client-state.js";
 
 const secret = "test-session-secret-long-enough";
@@ -175,4 +175,31 @@ test("center panel renders auth state before empty conversation state", () => {
   assert.match(css, /\.messages\.empty-state \{ justify-content:flex-start; \}/);
   assert.match(app, /<strong>Start a conversation<\/strong><span>Type a message below\. A new chat will be created automatically\.<\/span>/);
   assert.match(app, /const canCompose = state\.authenticated && state\.worker\?\.online && state\.usage\.remaining > 0;/);
+});
+
+test("worker model backends are explicit", async () => {
+  assert.equal(workerBackend({}), "control-center");
+  assert.equal(workerBackend({ MODEL_BACKEND: "lmstudio" }), "lmstudio");
+  const calls = [];
+  const fetcher = async (url, options = {}) => {
+    calls.push(String(url));
+    assert.equal(options.headers.authorization, "Bearer local-token");
+    if (String(url).endsWith("/api/local-bridge/health")) return Response.json({ ok: true, modelReady: true, model: "qwen3.6-27b" });
+    if (String(url).endsWith("/api/local-bridge/runs")) return Response.json({ run: { status: "completed", response: "Control Center answer", model: "qwen3.6-27b" } });
+    throw new Error(`unexpected fetch ${url}`);
+  };
+  const env = { LOCAL_CONTROL_CENTER_URL: "http://127.0.0.1:3478", LOCAL_CONTROL_CENTER_TOKEN: "local-token" };
+  const status = await localControlCenterStatus(env, fetcher);
+  assert.equal(status.online, true);
+  const result = await generateViaControlCenter(status, { id: "job-1", prompt: "hello", user: { provider: "github", externalId: "100", username: "vitaly-test" } }, env, fetcher);
+  assert.deepEqual(result, { content: "Control Center answer", model: "qwen3.6-27b" });
+  assert.equal(calls.some((url) => url.includes(":1234") || url.includes("/v1/chat/completions")), false);
+
+  const fallbackCalls = [];
+  const fallbackStatus = await lmStatus(async (url) => {
+    fallbackCalls.push(String(url));
+    return Response.json({ data: [{ id: "qwen3.6-27b" }] });
+  });
+  assert.equal(fallbackStatus.online, true);
+  assert.equal(fallbackCalls.some((url) => url.includes(":1234") && url.endsWith("/models")), true);
 });

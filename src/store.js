@@ -74,7 +74,8 @@ export class MemoryStore {
   async claimJob(workerId) {
     const now = iso(); const job = sorted([...this.jobs.values()].filter((item) => item.expiresAt > now && (item.status === "queued" || (["leased", "generating"].includes(item.status) && item.leaseExpiresAt < now))))[0];
     if (!job) return null; job.status = "leased"; job.workerId = workerId; job.leaseExpiresAt = iso(Date.now() + CLAIM_LEASE_MS); job.error = null;
-    return { id: job.id, type: "chat", prompt: job.prompt, model: job.model, maxOutputTokens: 1800, leaseExpiresAt: job.leaseExpiresAt };
+    const user = this.users.get(job.ownerId) || {};
+    return { id: job.id, type: "chat", chatId: job.chatId, user: { provider: "github", externalId: job.ownerId, username: user.login || "" }, prompt: job.prompt, model: job.model, maxOutputTokens: 1800, leaseExpiresAt: job.leaseExpiresAt };
   }
   async workerEvent(workerId, jobId, action, input) {
     const job = this.jobs.get(jobId);
@@ -128,8 +129,9 @@ export class FirestoreStore {
     return this.db.runTransaction(async (tx) => {
       const snap = await tx.get(this.db.collection("jobs").where("status", "in", ["queued", "leased", "generating"]).limit(50)); const now = iso(); const candidates = sorted(snap.docs.map((doc) => ({ ref: doc.ref, ...doc.data() }))); let selected;
       for (const job of candidates) { if (job.expiresAt <= now) { tx.update(job.ref, { status: "expired", error: "Job expired before completion." }); } else if (!selected && (job.status === "queued" || job.leaseExpiresAt < now)) { selected = job; } }
-      if (!selected) return null; const leaseExpiresAt = iso(Date.now() + CLAIM_LEASE_MS); tx.update(selected.ref, { status: "leased", workerId, leaseExpiresAt, error: null });
-      return { id: selected.id, type: "chat", prompt: selected.prompt, model: selected.model, maxOutputTokens: 1800, leaseExpiresAt };
+      if (!selected) return null; const leaseExpiresAt = iso(Date.now() + CLAIM_LEASE_MS); const userSnap = await tx.get(this.db.collection("users").doc(selected.ownerId)); tx.update(selected.ref, { status: "leased", workerId, leaseExpiresAt, error: null });
+      const user = userSnap.exists ? userSnap.data() : {};
+      return { id: selected.id, type: "chat", chatId: selected.chatId, user: { provider: "github", externalId: selected.ownerId, username: user.login || "" }, prompt: selected.prompt, model: selected.model, maxOutputTokens: 1800, leaseExpiresAt };
     });
   }
   async workerEvent(workerId, jobId, action, input) {

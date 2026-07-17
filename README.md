@@ -12,7 +12,7 @@
 
 **One interface. Multiple tools. Explicit control.**
 
-[![OPEN LIVE DEMO](https://img.shields.io/badge/OPEN_LIVE_DEMO-00E5D4?style=for-the-badge&logo=googlecloud&logoColor=white)](https://ai-workspace-control-center-745947699440.europe-west1.run.app) ·
+[![OPEN LIVE DEMO](https://img.shields.io/badge/OPEN_LIVE_DEMO-00E5D4?style=for-the-badge&logo=googlecloud&logoColor=white)](https://ai-workspace-control-center-745947699440.europe-west1.run.app) 
 
 [VIEW ARCHITECTURE](#architecture) · [PROJECT ROADMAP](#roadmap)
 

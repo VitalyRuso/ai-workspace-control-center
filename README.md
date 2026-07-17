@@ -48,7 +48,7 @@ This repository intentionally contains a **curated public preview**, not the ent
 ## Live demo
 
 **Public demo:**  
-[https://CONTROL-CENTER-DEMO-URL.run.app](https://CONTROL-CENTER-DEMO-URL.run.app)
+[https://ai-workspace-control-center-745947699440.europe-west1.run.app](https://ai-workspace-control-center-745947699440.europe-west1.run.app)
 
 The current public deployment is intentionally restricted.
 

@@ -1,12 +1,9 @@
-﻿.git
-node_modules
-npm-debug.log
-.DS_Store
+node_modules/
 .env
 .env.local
-worker
-test
 worker-secret.txt
 worker.pid
 worker-state.json
 worker.log
+worker.log.old
+coverage/

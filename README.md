@@ -1,368 +1,75 @@
-<div align="center">
+# AI Workspace Control Center
 
-# AI WORKSPACE CONTROL CENTER
+An authenticated public demonstration of a local-first AI chat architecture. GitHub users create persistent chats in Cloud Run; an outbound-only worker on Vitaly's PC claims bounded jobs and sends them to `qwen3.6-27b` through LM Studio.
 
-### **A local-first command center for AI tools, project workflows, and controlled execution.**
+**Public service:** https://ai-workspace-control-center-745947699440.europe-west1.run.app
 
-[![Status](https://img.shields.io/badge/status-public_preview-0f766e?style=for-the-badge)](#project-status)
-[![Node.js](https://img.shields.io/badge/Node.js-22-339933?style=for-the-badge&logo=node.js&logoColor=white)](#technology)
-[![Cloud Run](https://img.shields.io/badge/demo-Google_Cloud_Run-4285F4?style=for-the-badge&logo=googlecloud&logoColor=white)](#live-demo)
-[![Local First](https://img.shields.io/badge/architecture-local--first-111827?style=for-the-badge)](#architecture)
-[![Human Controlled](https://img.shields.io/badge/execution-human--controlled-14b8a6?style=for-the-badge)](#safety-boundaries)
+## Safety boundary
 
-**One interface. Multiple tools. Explicit control.**
+The browser can create chats, rename chats, submit messages, and poll owned jobs. It cannot configure the model, access files, run commands, install packages, open local applications, unload models, or reach Vitaly's network. The worker exposes no inbound listener and logs job metadata rather than prompts or secrets.
 
-[![OPEN LIVE DEMO](https://img.shields.io/badge/OPEN_LIVE_DEMO-00E5D4?style=for-the-badge&logo=googlecloud&logoColor=white)](https://ai-workspace-control-center-745947699440.europe-west1.run.app) 
-
-[VIEW ARCHITECTURE](#architecture) · [PROJECT ROADMAP](#roadmap)
-
-</div>
-
----
-
-<div align="center">
-  <img src="docs/assets/control-center-preview.png" width="440" alt="AI Workspace Control Center public preview">
-</div>
-
----
-
-## What this is
-
-AI Workspace Control Center is the public demonstration layer of a larger private local-first development workspace.
-
-It provides a visual command center for:
-
-- discovering registered AI tools and local applications;
-- opening focused workspaces such as Fullstack Designer;
-- planning projects through an AI-assisted chat interface;
-- inspecting local-model availability;
-- reviewing workflow and execution status;
-- keeping sensitive execution behind explicit confirmation boundaries.
-
-This repository intentionally contains a **curated public preview**, not the entire private workspace.
-
-> The goal is to demonstrate the product, architecture, interaction model, and engineering decisions without publishing private project data, local machine configuration, or unrestricted execution capabilities.
-
----
-
-## Live demo
-
-**Public demo:**  
-[https://ai-workspace-control-center-745947699440.europe-west1.run.app](https://ai-workspace-control-center-745947699440.europe-west1.run.app)
-
-The current public deployment is intentionally restricted.
-
-### Available in the public preview
-
-- Control Center interface
-- AI Chat workspace shell
-- Fullstack Designer launcher
-- Local-model status indicators
-- Safe demo API responses
-- Cloud-hosted static preview
-
-### Intentionally unavailable
-
-- access to Vitaly's local filesystem;
-- arbitrary shell execution;
-- private projects and conversations;
-- unrestricted package installation;
-- destructive workflows;
-- direct access to the local LLM;
-- unbounded AI generation.
-
-Live generation will be connected later through a separate authenticated Local Worker.
-
----
-
-## Product idea
-
-Most AI development tools hide orchestration behind one chat window.
-
-Control Center takes a different approach:
+## Request flow
 
 ```text
-SEE THE AVAILABLE TOOLS
-        ↓
-CHOOSE A FOCUSED WORKSPACE
-        ↓
-REVIEW CONTEXT AND STATUS
-        ↓
-PROPOSE AN ACTION
-        ↓
-CONFIRM BEFORE EXECUTION
+GitHub user → POST message → Firestore queued job → HTTP 202
+                                                ↓
+Browser polls owned job ← Firestore result ← Local Worker → LM Studio
 ```
 
-The interface is designed around visible state, bounded tools, and controlled actions—not invisible autonomy.
+Cloud Run never holds a request open during generation. Worker claims use Firestore transactions and leases; completion is idempotent. Each GitHub account may accept two generation jobs per UTC calendar day.
 
----
+## Local server
 
-## Architecture
-
-```mermaid
-flowchart LR
-    U[Demo user] --> C[Cloud Run public preview]
-    C --> UI[Control Center UI]
-    UI --> API[Restricted demo API]
-
-    API -. future authenticated jobs .-> Q[Cloud job queue]
-    W[Vitaly Local Worker] -. outbound polling .-> Q
-    W --> L[Local Qwen model]
-    W --> S[Isolated task workspace]
-
-    L --> R[Generated result]
-    S --> R
-    R -. validated response .-> C
-```
-
-### Public deployment
-
-```text
-GitHub main
-    ↓
-Cloud Build
-    ↓
-Docker image
-    ↓
-Google Cloud Run
-    ↓
-Public HTTPS demo
-```
-
-### Planned hybrid execution
-
-```text
-Small focused task
-      ↓
-Task-size gate
-      ↓
-Local Worker online?
-   ┌──┴──┐
-  yes    no
-   ↓      ↓
-Qwen   restricted cloud fallback
-   └──┬──┘
-      ↓
-validated result
-```
-
----
-
-## Current interface modules
-
-| Module | Purpose | Public status |
-|---|---|---|
-| AI Chat | Project planning and controlled action proposals | Interface preview |
-| Fullstack Designer | Focused project-design workspace | Launcher preview |
-| App Registry | Discover tools registered in the workspace | Restricted preview |
-| Runtime Status | Show local applications and model availability | Demo state |
-| Workflow Layer | Coordinate bounded multi-step actions | Private implementation |
-| Local LLM Gateway | Route tasks to a local model | Not connected publicly |
-
----
-
-## Safety boundaries
-
-The public preview is deliberately separated from the private workspace.
-
-It does not expose:
-
-- local directories;
-- environment secrets;
-- private model configuration;
-- personal project history;
-- system commands;
-- unrestricted code execution;
-- host-machine network access.
-
-Future live tasks will use:
-
-- GitHub authentication;
-- per-user daily quotas;
-- maximum task size;
-- strict timeout;
-- isolated temporary workspaces;
-- explicit task categories;
-- no autonomous retries;
-- no execution outside approved paths.
-
----
-
-## Demo task policy
-
-The planned live demo is designed for small, focused tasks.
-
-### Good demo requests
-
-- Create one architecture diagram
-- Generate one technical document
-- Build one isolated UI component
-- Define one API contract
-- Fix one issue in a small supplied file set
-- Produce a small project scaffold
-
-### Requests rejected by design
-
-- Build a complete production SaaS
-- Refactor an entire repository
-- Deploy arbitrary external infrastructure
-- Run unrestricted shell commands
-- Install unknown packages
-- Access private local files
-
-Large requests will be returned with a prompt to reduce the scope.
-
----
-
-## Technology
-
-| Area | Technology |
-|---|---|
-| Runtime | Node.js 22 |
-| Server | Native Node.js HTTP server |
-| Frontend | HTML, CSS, JavaScript |
-| Container | Docker |
-| Hosting | Google Cloud Run |
-| Delivery | GitHub → Cloud Build → Cloud Run |
-| Planned local inference | Qwen through a Local Worker |
-| Planned identity | GitHub OAuth |
-| Planned quota storage | Firestore |
-
----
-
-## Repository structure
-
-```text
-ai-workspace-control-center/
-├── public/
-│   ├── index.html
-│   ├── styles.css
-│   └── app.js
-├── docs/
-│   └── assets/
-│       └── control-center-preview.png
-├── Dockerfile
-├── .dockerignore
-├── package.json
-├── server.js
-└── README.md
-```
-
----
-
-## Run locally
-
-Requirements:
-
-- Node.js 22+
+Requires Node.js 22 and Application Default Credentials for a Firestore project.
 
 ```bash
-git clone https://github.com/VitalyRuso/ai-workspace-control-center.git
-cd ai-workspace-control-center
+npm ci
+npm test
 npm start
 ```
 
-Open:
+Copy `.env.example` to an ignored `.env` only if your launcher loads environment files. The application itself reads environment variables and never reads secrets from the browser.
 
-```text
-http://localhost:8080
-```
+## GitHub OAuth App
 
-To use another port:
+Create a GitHub OAuth App with:
+
+- Homepage URL: `https://ai-workspace-control-center-745947699440.europe-west1.run.app`
+- Callback URL: `https://ai-workspace-control-center-745947699440.europe-west1.run.app/auth/github/callback`
+- Scope requested by the app: `read:user`
+
+Provide `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `SESSION_SECRET`, and `PUBLIC_BASE_URL` to Cloud Run. The access token is discarded immediately after retrieving the GitHub profile.
+
+## Cloud Run deployment
+
+The deployment remains Docker-based on service `ai-workspace-control-center` in `europe-west1`, with minimum instances `0` and maximum instances `1`. Configure a native Firestore database, grant the service account Firestore access plus Secret Manager Secret Accessor, and store these values in Secret Manager:
+
+- `WORKER_TOKEN`
+- `GITHUB_CLIENT_ID`
+- `GITHUB_CLIENT_SECRET`
+- `SESSION_SECRET`
+
+Then deploy from this repository's `main` Dockerfile:
 
 ```bash
-PORT=3000 npm start
+gcloud run deploy ai-workspace-control-center \
+  --source . \
+  --region europe-west1 \
+  --allow-unauthenticated \
+  --min 0 \
+  --max 1 \
+  --set-env-vars PUBLIC_BASE_URL=https://ai-workspace-control-center-745947699440.europe-west1.run.app,WORKER_ID=vitaly-pc-01 \
+  --set-secrets WORKER_TOKEN=WORKER_TOKEN:latest,GITHUB_CLIENT_ID=GITHUB_CLIENT_ID:latest,GITHUB_CLIENT_SECRET=GITHUB_CLIENT_SECRET:latest,SESSION_SECRET=SESSION_SECRET:latest
 ```
 
-PowerShell:
+## Local Worker
 
-```powershell
-$env:PORT=3000
-npm start
-```
+See [`worker/README.md`](worker/README.md). Keep `worker-secret.txt`, PID/state files, and logs untracked.
 
----
+## Proven timeout root cause
 
-## Project status
-
-**Current stage:** public interface preview.
-
-The visual Control Center is deployed as a safe standalone demonstration. The private workspace, workflow executor, local project files, and local-model bridge are intentionally excluded.
-
----
-
-## Roadmap
-
-- [x] Extract a safe public Control Center preview
-- [x] Create a standalone Docker deployment
-- [x] Publish the repository
-- [ ] Deploy the public preview to Cloud Run
-- [ ] Add the final live-demo URL
-- [ ] Add GitHub authentication
-- [ ] Add per-user daily generation quotas
-- [ ] Connect Vitaly Local Worker
-- [ ] Route focused tasks to local Qwen
-- [ ] Add bounded cloud fallback
-- [ ] Add a public project-gallery mode
-
----
-
-## What this project demonstrates
-
-- Local-first AI product architecture
-- Separation between interface, orchestration, and execution
-- Controlled exposure of a private development environment
-- Human-in-the-loop interaction design
-- Safe public-demo extraction
-- Containerized deployment
-- Cloud Run delivery
-- Planning for local and cloud model routing
-- Product thinking around quotas, scope, privacy, and cost
-
----
-
-## Public preview strategy
-
-This repository is intentionally not a monorepo dump.
-
-The public GitHub portfolio uses two forms of publication:
-
-1. **Full technical repositories** for projects where source-level review is useful.
-2. **Curated demo repositories** for larger private systems where only one safe, representative slice should be public.
-
-A portfolio still needs at least one or two substantial source repositories. Demo-only repositories should complement real code examples, not replace all of them.
-
----
+The old Cloud endpoint waited synchronously for 150 seconds, while the active worker used the same 150-second abort timer for LM Studio. Worker logs prove the job was claimed and then failed with `This operation was aborted`; the browser subsequently received the generic demo timeout. The asynchronous job API removes both coupled timers, and the worker now permits six-minute local generations.
 
 ## Author
 
-Built by **Vitaly**  
-GitHub: [@VitalyRuso](https://github.com/VitalyRuso)
-
-Interests:
-
-- AI developer tools
-- local-first systems
-- browser automation
-- human-in-the-loop agents
-- project-generation workflows
-- practical full-stack engineering
-
----
-
-<details>
-<summary><strong>Control Center principle</strong></summary>
-
-<br>
-
-```text
-No giant monorepo dump.
-No fake autonomy.
-No invisible execution.
-
-Show the system.
-Bound the task.
-Confirm the action.
-```
-
-</details>
+Built by Vitaly — [@VitalyRuso](https://github.com/VitalyRuso)
